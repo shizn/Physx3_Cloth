@@ -24,6 +24,10 @@ Please refer to last chapter (PhysX Visual Debugger) for more information.
 #include <iostream> 
 #include <vector>
 #include <conio.h>
+//random
+#include <stdlib.h>
+#include <time.h>
+//
 #include <PxPhysicsAPI.h> //Single header file to include all features of PhysX API 
 
 
@@ -42,6 +46,7 @@ Please refer to last chapter (PhysX Visual Debugger) for more information.
 #pragma comment(lib, "PhysXVisualDebuggerSDK.lib")
 #endif
 
+
 using namespace std;
 using namespace physx;
 
@@ -59,8 +64,8 @@ PxCloth*						gCloth = NULL;				//Instance of Cloth
 PxParticleFluid*				gFluid = NULL;				//Instance of Physx SPH Particle system
 //Fluid Data Buffer
 std::vector<PxU32> mTmpIndexArray;
-std::vector<PxVec3> positions(300, PxVec3(1, 1, 1));
-std::vector<PxVec3> velocities(300, PxVec3(0, 0, 0));
+std::vector<PxVec3> positions;
+std::vector<PxVec3> velocities;
 
 //-----------PhysX function prototypes------------//
 void CreateCloth();		//Create cloth
@@ -84,7 +89,7 @@ void main()
 	ConnectPVD(); //Uncomment this function to visualize  the simulation in PVD
 
 	//Simulate PhysX 300 times
-	for (int i = 0; i <= 300; i++)
+	for (int i = 0; i <= 800; i++)
 	{
 		//Step PhysX simulation
 		if (gScene)
@@ -107,10 +112,10 @@ void main()
 void CreateCloth()
 {
 
-	PxTransform gPose = PxTransform(PxVec3(0, 1, 0));
+	PxTransform gPose = PxTransform(PxVec3(0, 0, 0));
 
 	// create regular mesh
-	PxU32 resolution = 20;
+	PxU32 resolution = 200;
 	PxU32 numParticles = resolution*resolution;
 	PxU32 numTriangles = 2 * (resolution - 1)*(resolution - 1);
 
@@ -268,9 +273,9 @@ void InitPhysX()
 		//int maxParticles = 500;
 
 		// create particle system in PhysX SDK
-		gFluid = gPhysicsSDK->createParticleFluid(500);
+		gFluid = gPhysicsSDK->createParticleFluid(800);
 		gFluid->setGridSize(5.0f);
-		gFluid->setMaxMotionDistance(0.3f);
+		gFluid->setMaxMotionDistance(0.01f);
 		gFluid->setRestOffset(0.8f*0.3f);
 		gFluid->setContactOffset(0.8f*0.3f * 2);
 		gFluid->setDamping(0.0f);
@@ -286,13 +291,26 @@ void InitPhysX()
 
 		static const PxFilterData collisionGroupWaterfall(0, 0, 1, 0);
 		gFluid->setSimulationFilterData(collisionGroupWaterfall);
-		for (int i = 0; i < 300; ++i)
+
+		srand(time(NULL));
+		for (int i = 0; i < 800; ++i)
 		{
 			mTmpIndexArray.push_back(i);
+			float num1, num2, num3;
+			num1 = (rand() % 100)*0.001;
+			num2 = (rand() % 100)*0.001;
+			num3 = (rand() % 100)*0.001;
+			PxVec3 pos(num1, num2, num3);
+			PxVec3 vel(-num1, -num2, -num3);
+			//PxVec3 vel(0, 0, 0);
+			positions.push_back(pos);
+			velocities.push_back(vel);
+			cout << num1 << num2 << num3 << endl;
 		}
+
 		PxParticleCreationData particleCreationData;
 
-		particleCreationData.numParticles = 300;
+		particleCreationData.numParticles = 800;
 		particleCreationData.indexBuffer = PxStrideIterator<const PxU32>(&mTmpIndexArray[0]);
 		particleCreationData.positionBuffer = PxStrideIterator<const PxVec3>(&positions[0]);
 		particleCreationData.velocityBuffer = PxStrideIterator<const PxVec3>(&velocities[0]);
