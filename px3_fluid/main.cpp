@@ -69,7 +69,7 @@ std::vector<PxVec3> velocities;
 
 //-----------PhysX function prototypes------------//
 void CreateCloth();		//Create cloth
-void CreateFluid(PxU32 maxParticles, PxReal restitution, PxReal viscosity, PxReal stiffness, PxReal dynamicFriction, PxReal particleDistance);
+void CreateFluid();
 						//Create Physx SPH Particles
 
 void InitPhysX();		//Initialize the PhysX SDK and create two actors. 
@@ -180,36 +180,63 @@ void CreateCloth()
 	// 240 iterations per/second (4 per-60hz frame)
 	gCloth->setSolverFrequency(240.0f);
 
+
+	// set global pose
+	gCloth->setGlobalPose(PxTransform(PxVec3(-10.0f, 0.0f, 10.0f)));
+
+
 	gScene->addActor(*gCloth);
 
 
 }
 
 
-void CreateFluid(PxU32 maxParticles, PxReal restitution, PxReal viscosity,
-	PxReal stiffness, PxReal dynamicFriction, PxReal particleDistance)
+void CreateFluid()
 {
-	// set immutable properties.
-	//int maxParticles = 500;
-
 	// create particle system in PhysX SDK
-	gFluid = gPhysicsSDK->createParticleFluid(maxParticles);
+	gFluid = gPhysicsSDK->createParticleFluid(800);
 	gFluid->setGridSize(5.0f);
-	gFluid->setMaxMotionDistance(0.3f);
-	gFluid->setRestOffset(particleDistance*0.3f);
-	gFluid->setContactOffset(particleDistance*0.3f * 2);
+	gFluid->setMaxMotionDistance(0.01f);
+	gFluid->setRestOffset(0.8f*0.3f);
+	gFluid->setContactOffset(0.8f*0.3f * 2);
 	gFluid->setDamping(0.0f);
-	gFluid->setRestitution(restitution);
-	gFluid->setDynamicFriction(dynamicFriction);
-	gFluid->setRestParticleDistance(particleDistance);
-	gFluid->setViscosity(viscosity);
-	gFluid->setStiffness(stiffness);
+	gFluid->setRestitution(0.3f);
+	gFluid->setDynamicFriction(0.001f);
+	gFluid->setRestParticleDistance(0.8f);
+	gFluid->setViscosity(60.0f);
+	gFluid->setStiffness(45.0f);
 	gFluid->setParticleReadDataFlag(PxParticleReadDataFlag::eVELOCITY_BUFFER, true);
-
 	// CPU now
 	// add particle system to scene, in case creation was successful
-	if (gFluid)
-		gScene->addActor(*gFluid);
+	gScene->addActor(*gFluid);
+
+	static const PxFilterData collisionGroupWaterfall(0, 0, 1, 0);
+	gFluid->setSimulationFilterData(collisionGroupWaterfall);
+
+	srand(time(NULL));
+	for (int i = 0; i < 800; ++i)
+	{
+		mTmpIndexArray.push_back(i);
+		float num1, num2, num3;
+		num1 = (rand() % 100)*0.001;
+		num2 = (rand() % 100)*0.001;
+		num3 = (rand() % 100)*0.001;
+		PxVec3 pos(num1, num2, num3);
+		PxVec3 vel(-num1, -num2, -num3);
+		//PxVec3 vel(0, 0, 0);
+		positions.push_back(pos);
+		velocities.push_back(vel);
+		cout << num1 << num2 << num3 << endl;
+	}
+
+	PxParticleCreationData particleCreationData;
+
+	particleCreationData.numParticles = 800;
+	particleCreationData.indexBuffer = PxStrideIterator<const PxU32>(&mTmpIndexArray[0]);
+	particleCreationData.positionBuffer = PxStrideIterator<const PxVec3>(&positions[0]);
+	particleCreationData.velocityBuffer = PxStrideIterator<const PxVec3>(&velocities[0]);
+
+	gFluid->createParticles(particleCreationData);
 
 }
 
@@ -266,56 +293,12 @@ void InitPhysX()
 		gCloth->addCollisionPlane(PxClothCollisionPlane(PxVec3(0, 1, 0), 0.0f));
 		gCloth->addCollisionConvex(1 << 0); // Convex references the first plane
 	}
+
 	//4-Creating SPH Particle Fluid
+	CreateFluid();
 
-		//CreateFluid(50000, 0.3f, 60.0f, 45.0f, 0.001f, 0.8f);
-		// set immutable properties.
-		//int maxParticles = 500;
 
-		// create particle system in PhysX SDK
-		gFluid = gPhysicsSDK->createParticleFluid(800);
-		gFluid->setGridSize(5.0f);
-		gFluid->setMaxMotionDistance(0.01f);
-		gFluid->setRestOffset(0.8f*0.3f);
-		gFluid->setContactOffset(0.8f*0.3f * 2);
-		gFluid->setDamping(0.0f);
-		gFluid->setRestitution(0.3f);
-		gFluid->setDynamicFriction(0.001f);
-		gFluid->setRestParticleDistance(0.8f);
-		gFluid->setViscosity(60.0f);
-		gFluid->setStiffness(45.0f);
-		gFluid->setParticleReadDataFlag(PxParticleReadDataFlag::eVELOCITY_BUFFER, true);
-		// CPU now
-		// add particle system to scene, in case creation was successful
-		gScene->addActor(*gFluid);
 
-		static const PxFilterData collisionGroupWaterfall(0, 0, 1, 0);
-		gFluid->setSimulationFilterData(collisionGroupWaterfall);
-
-		srand(time(NULL));
-		for (int i = 0; i < 800; ++i)
-		{
-			mTmpIndexArray.push_back(i);
-			float num1, num2, num3;
-			num1 = (rand() % 100)*0.001;
-			num2 = (rand() % 100)*0.001;
-			num3 = (rand() % 100)*0.001;
-			PxVec3 pos(num1, num2, num3);
-			PxVec3 vel(-num1, -num2, -num3);
-			//PxVec3 vel(0, 0, 0);
-			positions.push_back(pos);
-			velocities.push_back(vel);
-			cout << num1 << num2 << num3 << endl;
-		}
-
-		PxParticleCreationData particleCreationData;
-
-		particleCreationData.numParticles = 800;
-		particleCreationData.indexBuffer = PxStrideIterator<const PxU32>(&mTmpIndexArray[0]);
-		particleCreationData.positionBuffer = PxStrideIterator<const PxVec3>(&positions[0]);
-		particleCreationData.velocityBuffer = PxStrideIterator<const PxVec3>(&velocities[0]);
-
-		gFluid->createParticles(particleCreationData);
 
 
 
