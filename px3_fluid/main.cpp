@@ -38,12 +38,14 @@ Please refer to last chapter (PhysX Visual Debugger) for more information.
 #pragma comment(lib, "PhysX3CommonDEBUG_x86.lib")		//Always be needed
 #pragma comment(lib, "PhysX3ExtensionsDEBUG.lib")		//PhysX extended library 
 #pragma comment(lib, "PhysXVisualDebuggerSDKDEBUG.lib") //For PVD only 
+#pragma comment(lib, "PhysX3GpuDEBUG_x86.lib")			//For GPU CUDA
 
 #else //Else load libraries for 'Release' mode
 #pragma comment(lib, "PhysX3_x86.lib")	
 #pragma comment(lib, "PhysX3Common_x86.lib") 
 #pragma comment(lib, "PhysX3Extensions.lib")
 #pragma comment(lib, "PhysXVisualDebuggerSDK.lib")
+#pragma comment(lib, "PhysX3Gpu_x86.lib")	
 #endif
 
 
@@ -68,7 +70,7 @@ std::vector<PxVec3> positions;
 std::vector<PxVec3> velocities;
 
 //-----------PhysX function prototypes------------//
-void CreateCloth();		//Create cloth
+void CreateCloth(PxVec3 globalPosition);		//Create cloth
 void CreateFluid();
 						//Create Physx SPH Particles
 
@@ -89,7 +91,7 @@ void main()
 	ConnectPVD(); //Uncomment this function to visualize  the simulation in PVD
 
 	//Simulate PhysX 300 times
-	for (int i = 0; i <= 800; i++)
+	for (int i = 0; i <= 8000; i++)
 	{
 		//Step PhysX simulation
 		if (gScene)
@@ -98,6 +100,21 @@ void main()
 		//Get current position of actor(box) and print it
 		//PxVec3 boxPos = gBox->getGlobalPose().p;
 		//cout << "Box current Position (" << boxPos.x << " " << boxPos.y << " " << boxPos.z << ")\n";
+
+
+		if (i == 1300)
+		{
+
+			//Creating PhysX material
+			PxMaterial* material = gPhysicsSDK->createMaterial(0.5, 0.5, 0.5); //Creating a PhysX material
+			PxRigidDynamic					*gBox1 = NULL;
+			PxTransform		boxPos(PxVec3(0.0f, 5.0f, 0.0f));												//Position and orientation(transform) for box actor 
+			PxBoxGeometry	boxGeometry(PxVec3(0.4, 0.4, 0.4));											//Defining geometry for box actor
+			gBox1 = PxCreateDynamic(*gPhysicsSDK, boxPos, boxGeometry, *material, 1.0f);		//Creating rigid static actor
+			gBox1->setMass(0.01f);
+			gScene->addActor(*gBox1);
+
+		}
 
 	}
 
@@ -109,7 +126,7 @@ void main()
 
 }
 
-void CreateCloth()
+void CreateCloth(PxVec3 globalPosition)
 {
 
 	PxTransform gPose = PxTransform(PxVec3(0, 0, 0));
@@ -182,7 +199,12 @@ void CreateCloth()
 
 
 	// set global pose
-	gCloth->setGlobalPose(PxTransform(PxVec3(-10.0f, 0.0f, 10.0f)));
+	gCloth->setGlobalPose(PxTransform(globalPosition));
+	//
+
+	// set self collision 
+	gCloth->setSelfCollisionDistance(0.1f);
+	gCloth->setSelfCollisionStiffness(1.0f);
 
 
 	gScene->addActor(*gCloth);
@@ -206,6 +228,8 @@ void CreateFluid()
 	gFluid->setViscosity(60.0f);
 	gFluid->setStiffness(45.0f);
 	gFluid->setParticleReadDataFlag(PxParticleReadDataFlag::eVELOCITY_BUFFER, true);
+	//particle mass for floating box
+	gFluid->setParticleMass(100.0f);
 	// CPU now
 	// add particle system to scene, in case creation was successful
 	gScene->addActor(*gFluid);
@@ -218,15 +242,15 @@ void CreateFluid()
 	{
 		mTmpIndexArray.push_back(i);
 		float num1, num2, num3;
-		num1 = (rand() % 100)*0.001;
-		num2 = (rand() % 100)*0.001;
-		num3 = (rand() % 100)*0.001;
+		num1 = (rand() % 100)*0.01;
+		num2 = (rand() % 100)*0.01;
+		num3 = (rand() % 100)*0.01;
 		PxVec3 pos(num1, num2, num3);
-		PxVec3 vel(-num1, -num2, -num3);
-		//PxVec3 vel(0, 0, 0);
+		//PxVec3 vel(-num1, -num2, -num3);
+		PxVec3 vel(0, 0, 0);
 		positions.push_back(pos);
 		velocities.push_back(vel);
-		cout << num1 << num2 << num3 << endl;
+		//cout << num1 << num2 << num3 << endl;
 	}
 
 	PxParticleCreationData particleCreationData;
@@ -281,17 +305,49 @@ void InitPhysX()
 
 
 	//2-Creating dynamic cube																		 
-	PxTransform		boxPos(PxVec3(0.0f, 10.0f, 0.0f));												//Position and orientation(transform) for box actor 
-	PxBoxGeometry	boxGeometry(PxVec3(2, 2, 2));											//Defining geometry for box actor
-	gBox = PxCreateDynamic(*gPhysicsSDK, boxPos, boxGeometry, *material, 1.0f);		//Creating rigid static actor
-	//gScene->addActor(*gBox);														//Adding box actor to PhysX scene
+	PxTransform		boxPos(PxVec3(2.0f, 0.0f, 0.0f));							//Position and orientation(transform) for box actor 
+	PxBoxGeometry	boxGeometry(PxVec3(2, 2, 2));								//Defining geometry for box actor
+	gBox = PxCreateDynamic(*gPhysicsSDK, boxPos, boxGeometry, *material, 1.0f);	//Creating rigid static actor
+	gScene->addActor(*gBox);													//Adding box actor to PhysX scene
+
+	PxRigidStatic *gBowl1 = NULL;
+	PxTransform		bowlPos1(PxVec3(-2.0f, 2.0f, 0.0f));						//Position and orientation(transform) for box actor 
+	PxBoxGeometry	bowlGeometry(PxVec3(0.1, 2, 2));							//Defining geometry for box actor
+	gBowl1 = PxCreateStatic(*gPhysicsSDK, bowlPos1, bowlGeometry, *material);	//Creating rigid static actor
+	gScene->addActor(*gBowl1);													//Adding box actor to PhysX scene
+	
+	PxRigidStatic *gBowl2 = NULL;
+	PxTransform		bowlPos2(PxVec3(2.0f, 2.0f, 0.0f));							//Position and orientation(transform) for box actor 
+	PxBoxGeometry	bowlGeometry2(PxVec3(0.1, 2, 2));							//Defining geometry for box actor
+	gBowl2 = PxCreateStatic(*gPhysicsSDK, bowlPos2, bowlGeometry2, *material);	//Creating rigid static actor
+	gScene->addActor(*gBowl2);
+
+	PxRigidStatic *gBowl3 = NULL;
+	PxTransform		bowlPos3(PxVec3(0.0f, 2.0f, 2.0f));							//Position and orientation(transform) for box actor 
+	PxBoxGeometry	bowlGeometry3(PxVec3(2, 2, 0.1));							//Defining geometry for box actor
+	gBowl3 = PxCreateStatic(*gPhysicsSDK, bowlPos3, bowlGeometry3, *material);	//Creating rigid static actor
+	gScene->addActor(*gBowl3);
+
+	PxRigidStatic *gBowl4 = NULL;
+	PxTransform		bowlPos4(PxVec3(0.0f, 2.0f, -2.0f));						//Position and orientation(transform) for box actor 
+	PxBoxGeometry	bowlGeometry4(PxVec3(2, 2, 0.1));							//Defining geometry for box actor
+	gBowl4 = PxCreateStatic(*gPhysicsSDK, bowlPos4, bowlGeometry4, *material);	//Creating rigid static actor
+	gScene->addActor(*gBowl4);
 
 	//3-Creating dynamic cloth
 	{
-		CreateCloth();
-
-		gCloth->addCollisionPlane(PxClothCollisionPlane(PxVec3(0, 1, 0), 0.0f));
-		gCloth->addCollisionConvex(1 << 0); // Convex references the first plane
+//		CreateCloth(PxVec3(0, 10, 10));
+//		CreateCloth(PxVec3(0, 0, 10));
+//		gScene->setClothInterCollisionDistance(0.5f);
+//		gScene->setClothInterCollisionStiffness(1.0f);
+//
+//		gCloth->addCollisionPlane(PxClothCollisionPlane(PxVec3(0, 1, 0), 0.0f));
+//		gCloth->addCollisionConvex(1 << 0); // Convex references the first plane
+//
+//#if PX_SUPPORT_GPU_PHYSX
+//		gCloth->setClothFlag(PxClothFlag::eGPU, true);
+//#endif
+//
 	}
 
 	//4-Creating SPH Particle Fluid
