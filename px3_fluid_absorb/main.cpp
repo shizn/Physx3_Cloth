@@ -35,7 +35,8 @@ Please refer to last chapter (PhysX Visual Debugger) for more information.
 #include <time.h>
 //
 #include <PxPhysicsAPI.h> //Single header file to include all features of PhysX API 
-
+#include "PsString.h"
+#include "windows/PsWindowsFile.h"
 
 //-------Loading PhysX libraries (32bit only)----------//
 
@@ -55,7 +56,7 @@ Please refer to last chapter (PhysX Visual Debugger) for more information.
 using namespace std;
 using namespace physx;
 
-
+#define  FLUID_PARTICLE_NUMS 800
 //--------------Global variables--------------//
 static PxPhysics*				gPhysicsSDK = NULL;			//Instance of PhysX SDK
 static PxFoundation*			gFoundation = NULL;			//Instance of singleton foundation SDK class
@@ -83,6 +84,7 @@ std::vector<PxVec3> velocities;
 void InitPhysX();		//Initialize the PhysX SDK and create two actors. 
 void StepPhysX();		//Step PhysX simulation 300 times.
 
+void CreateTestSphere(PxVec3 pos, PxReal radius);//
 void CreateCloth();		//
 void CreateFluid();		//
 
@@ -108,11 +110,11 @@ void main()
 		//Step PhysX simulation
 		if (gScene)
 			StepPhysX();
-
 		//Get current position of actor(box) and print it
-		PxVec3 boxPos = gBox->getGlobalPose().p;
-		cout << "Box current Position (" << boxPos.x << " " << boxPos.y << " " << boxPos.z << ")\n";
+		//PxVec3 boxPos = gBox->getGlobalPose().p;
+		//cout << "Box current Position (" << boxPos.x << " " << boxPos.y << " " << boxPos.z << ")\n";
 	}
+
 
 	cout << "\nSimulation is done, shutting down PhysX!\n";
 
@@ -147,12 +149,13 @@ void InitPhysX()
 	sceneDesc.gravity = PxVec3(0.0f, -9.8f, 0.0f);		//Setting gravity
 	sceneDesc.cpuDispatcher = PxDefaultCpuDispatcherCreate(1);	//Creates default CPU dispatcher for the scene
 	sceneDesc.filterShader = PxDefaultSimulationFilterShader;	//Creates default collision filter shader for the scene
+	sceneDesc.flags |= PxSceneFlag::eENABLE_CCD;                //Enable CCD
 
 	gScene = gPhysicsSDK->createScene(sceneDesc);				//Creates a scene 
 
 
 	//Creating PhysX material
-	PxMaterial* material = gPhysicsSDK->createMaterial(10.5, 10.5, 10.5); //Creating a PhysX material
+	PxMaterial* material = gPhysicsSDK->createMaterial(0.5, 0.5, 0.5); //Creating a PhysX material
 
 
 
@@ -166,30 +169,73 @@ void InitPhysX()
 
 
 	//2-Creating dynamic cube																		 
-	PxTransform		boxPos(PxVec3(0.0f, 2.0f, 0.0f));												//Position and orientation(transform) for box actor 
-	PxBoxGeometry	boxGeometry(PxVec3(2, 2, 2));													//Defining geometry for box actor
-	gBox = PxCreateDynamic(*gPhysicsSDK, boxPos, boxGeometry, *material, 1.0f);						//Creating rigid static actor
-	gScene->addActor(*gBox);																		//Adding box actor to PhysX scene
+	//PxTransform		boxPos(PxVec3(0.0f, 2.0f, 0.0f));												//Position and orientation(transform) for box actor 
+	//PxBoxGeometry	boxGeometry(PxVec3(2, 2, 2));													//Defining geometry for box actor
+	//gBox = PxCreateDynamic(*gPhysicsSDK, boxPos, boxGeometry, *material, 1.0f);						//Creating rigid static actor
+	//gBox->setRigidBodyFlag(PxRigidBodyFlag::eENABLE_CCD, true);
+
+	//gScene->addActor(*gBox);																		//Adding box actor to PhysX scene
 
 
 	//3-Creating static ball
-	PxTransform ballPos(PxVec3(5.0f, 2.0f, 0.0f));
-	PxSphereGeometry ballGeometry(PxReal(2.0f));
-	gBall = PxCreateDynamic(*gPhysicsSDK, ballPos, ballGeometry, *material, 1.0f);
-	gScene->addActor(*gBall);
+	//PxTransform ballPos(PxVec3(5.0f, 2.0f, 0.0f));
+	//PxSphereGeometry ballGeometry(PxReal(2.0f));
+	//gBall = PxCreateDynamic(*gPhysicsSDK, ballPos, ballGeometry, *material, 1.0f);
+	//gBall->setRigidBodyFlag(PxRigidBodyFlag::eENABLE_CCD, true);
+	//gScene->addActor(*gBall);
 	
-	//4-Creating Cloth
+	//3.5-test
+
+
+	//CreateTestSphere(PxVec3(2.0f, 20.0f, 0.0f), PxReal(0.7f));
+
+	//4-Creating Fluid
+	CreateFluid();
+
+    //////////////////////////////////////////////////////////////////////////
+    ///4.5 - For Paper
+    //需要拿到的信息包括流体粒子的质量，流体粒子的位置、速度
+    int particleNum = gFluid->getMaxParticles();        //粒子个数
+    PxReal particleMass = gFluid->getParticleMass();    //粒子质量
+    
+    cout << "particleNum:" << particleNum << endl;
+    cout << "particleMass:" << particleMass << endl;
+
+
+    //粒子的位置速度和作用力需要在update的时候每次用Buffer读取
+    //需要更新的信息主要是冲量
+    //for (int i = 0; i < particleNum/2; i++)
+    //{
+    //    positions[i] = PxVec3(0, 10, 0);
+    //}
+    //PxStrideIterator<const PxVec3> posBuffer(&positions[0]);
+    //PxStrideIterator<const PxU32> indexBuffer(&mTmpIndexArray[0]);
+    //gFluid->setPositions(particleNum, indexBuffer, posBuffer);
+    //OK!
+
+
+    //////////////////////////////////////////////////////////////////////////
+
+	//5-Creating Cloth
 	CreateCloth();
 
-	//5-Creating Fluid
-	CreateFluid();
+
 
 	//6-Contact Modification
 	
 	
 }
 
-
+void CreateTestSphere(PxVec3 pos, PxReal radius)
+{
+	PxMaterial* material = gPhysicsSDK->createMaterial(0.5, 0.5, 0.5); //Creating a PhysX material
+	PxRigidDynamic *gParticle = NULL;
+	PxTransform gParticlePos(pos);
+	PxSphereGeometry gParticleGeometry(radius);
+	gParticle = PxCreateDynamic(*gPhysicsSDK, gParticlePos, gParticleGeometry, *material, 1.0f);
+	gParticle->setRigidBodyFlag(PxRigidBodyFlag::eENABLE_CCD, true);
+	gScene->addActor(*gParticle);
+}
 void CreateCloth()
 {
 
@@ -210,12 +256,12 @@ void CreateCloth()
 		for (PxU32 j = 0; j < resolution; ++j, ++pIt)
 		{
 			// if weight == 0, particle is fixed
-			pIt->invWeight = j + 1 < resolution ? 0.5f : 0.5f;
+			pIt->invWeight = j + 1 < resolution ? 0.0f : 0.5f;
 			pIt->pos = delta.multiply(PxVec3(PxReal(i),
 				PxReal(j), -PxReal(j))) - center;
 		}
 	}
-
+	// 现在所有布料粒子的位置已经确定 在每个的pos里面
 	// create triangles
 	PxU32* triangles = new PxU32[3 * numTriangles];
 	PxU32* iIt = triangles;
@@ -232,7 +278,7 @@ void CreateCloth()
 			*iIt++ = i*resolution + (j + odd);
 		}
 	}
-
+	// 现在所有对应三角形的位置已经确定 在triangle里面
 	// create fabric from mesh
 	PxClothMeshDesc meshDesc;
 	meshDesc.points.count = numParticles;
@@ -254,7 +300,7 @@ void CreateCloth()
 	delete[] triangles;
 
 	// create cloth
-	gCloth = gPhysicsSDK->createCloth(gPose, *fabric, particles, PxClothFlags(0));
+	gCloth = gPhysicsSDK->createCloth(gPose, *fabric, particles, PxClothFlags());
 
 	fabric->release();
 	delete[] particles;
@@ -272,17 +318,45 @@ void CreateCloth()
 	// set friction
 	gCloth->setFrictionCoefficient(0.8f);
 
+	// Two spheres located on the x-axis
+
+	PxClothCollisionSphere spheres[2] =
+	{
+		PxClothCollisionSphere(PxVec3(-1.0f, 0.0f, 0.0f), 2.5f),
+		PxClothCollisionSphere(PxVec3(1.0f, 0.0f, 0.0f), 2.25f)
+	};
+	//gCloth->setCollisionSpheres(spheres, 2);
+	//gCloth->addCollisionCapsule(0, 1);
+
+
+
 	gScene->addActor(*gCloth);
 
 
 }
 
+//办法1是创建用来和流体碰撞的三角形们
+void CreateGhostTriangles(PxU32* triangles)
+{
+	PxRigidDynamic *atri = NULL;
+	//PxTriangleMeshGeometry trianglegeometry()
+}
+//办法2是创建用来和布料碰撞的球体们
+void CreateGhostSphere()
+{
+	//每个粒子的速度和位置已经保存在position和velocity里面
+	//这些碰撞粒子并不需要真的存在，只需要加入到布料的碰撞队列中即可
+	//这样可以避免粒子和碰撞形体冲突
+}
 
+void CreateClothFromObj()
+{
+}
 
 void CreateFluid()
 {
 	// create particle system in PhysX SDK
-	gFluid = gPhysicsSDK->createParticleFluid(800);
+	gFluid = gPhysicsSDK->createParticleFluid(FLUID_PARTICLE_NUMS);
 	gFluid->setGridSize(5.0f);
 	gFluid->setMaxMotionDistance(0.01f);
 	gFluid->setRestOffset(0.8f*0.3f);
@@ -304,7 +378,7 @@ void CreateFluid()
 	gFluid->setSimulationFilterData(collisionGroupWaterfall);
 
 	srand(time(NULL));
-	PxVec3 globalPosition(0.0f, 10.0f, 0.0f);
+	PxVec3 globalPosition(0.0f, 15.0f, 0.0f);
 	for (int i = 0; i < 800; ++i)
 	{
 		mTmpIndexArray.push_back(i);
@@ -372,4 +446,42 @@ void ConnectPVD()					//Function for the visualization of PhysX simulation (Opti
 }
 
 
+
+//Help functions
+
+static void FixSeparators(char* path)
+{
+	for (unsigned i = 0; i < strlen(path); ++i)
+		if (path[i] == '\\' || path[i] == '/')
+			path[i] = '\\';
+}
+
+
+const char* findPath(const char* path)
+{
+	static std::vector<char*>* gSearchPaths = NULL;
+
+	if (!gSearchPaths)
+		return NULL;
+
+	static char fullPath[512];
+	FILE* file = NULL;
+	const PxU32 numSearchPaths = (PxU32)gSearchPaths->size();
+	for (PxU32 i = 0; i < numSearchPaths; i++)
+	{
+		const char* prefix = (*gSearchPaths)[i];
+		physx::string::strcpy_s(fullPath, 512, prefix);
+		physx::string::strcat_s(fullPath, 512, path);
+		FixSeparators(fullPath);
+		physx::shdfnd::fopen_s(&file, fullPath, "rb");
+		if (file) break;
+	}
+	if (file)
+	{
+		fclose(file);
+		return fullPath;
+	}
+	else
+		return path;
+}
 
