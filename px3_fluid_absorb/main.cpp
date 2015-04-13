@@ -56,7 +56,7 @@ Please refer to last chapter (PhysX Visual Debugger) for more information.
 using namespace std;
 using namespace physx;
 
-#define  FLUID_PARTICLE_NUMS 20
+#define  FLUID_PARTICLE_NUMS 200
 //--------------Global variables--------------//
 static PxPhysics*				gPhysicsSDK = NULL;			//Instance of PhysX SDK
 static PxFoundation*			gFoundation = NULL;			//Instance of singleton foundation SDK class
@@ -167,10 +167,10 @@ void InitPhysX()
 	//---------Creating actors-----------]
 
 	//1-Creating static plane	 
-	//PxTransform planePos = PxTransform(PxVec3(0.0f), PxQuat(PxHalfPi, PxVec3(0.0f, 0.0f, 1.0f)));	//Position and orientation(transform) for plane actor  
-	//PxRigidStatic* plane = gPhysicsSDK->createRigidStatic(planePos);								//Creating rigid static actor	
-	//plane->createShape(PxPlaneGeometry(), *material);												//Defining geometry for plane actor
-	//gScene->addActor(*plane);																		//Adding plane actor to PhysX scene
+	PxTransform planePos = PxTransform(PxVec3(0.0f), PxQuat(PxHalfPi, PxVec3(0.0f, 0.0f, 1.0f)));	//Position and orientation(transform) for plane actor  
+	PxRigidStatic* plane = gPhysicsSDK->createRigidStatic(planePos);								//Creating rigid static actor	
+	plane->createShape(PxPlaneGeometry(), *material);												//Defining geometry for plane actor
+	gScene->addActor(*plane);																		//Adding plane actor to PhysX scene
 
 
 	//2-Creating dynamic cube																		 
@@ -392,12 +392,12 @@ void CreateFluid()
 	{
 		mTmpIndexArray.push_back(i);
 		float num1, num2, num3;
-		//num1 = (rand() % 100)*0.01;
-		//num2 = (rand() % 100)*0.01;
-		//num3 = (rand() % 100)*0.01;
-        num2 = i / 3.f;
-        num1 = 0.f;
-        num3 = 0.f;
+		num1 = (rand() % 100)*0.01;
+		num2 = (rand() % 100)*0.01;
+		num3 = (rand() % 100)*0.01;
+        //num2 = i / 3.f;
+        //num1 = 0.f;
+        //num3 = 0.f;
 		PxVec3 pos(num1, num2, num3);
 		pos = pos + globalPosition;
 		//PxVec3 vel(-num1, -num2, -num3);
@@ -475,7 +475,8 @@ void StepPhysX()					//Stepping PhysX
                 }
                 //重组所有的三角面片
                 bool collisionDetected = false;
-                for (PxU32 j = 0; j < 14406; j=j+3)
+                data->unlock();
+                for (PxU32 j = 0; j < 14406; j=j+3) //这里的数字是所有点的总数
                 {
 
                     float u, v, w = 0.0f;
@@ -484,6 +485,7 @@ void StepPhysX()					//Stepping PhysX
                     PxVec3 &x3 = clothParticlePos[triangles[j]];
                     PxVec3 &x2 = clothParticlePos[triangles[j + 1]];
                     PxVec3 &x1 = clothParticlePos[triangles[j + 2]];
+                    //在150413的版本中，对于快速移动的布料和流体 无法进行正确的碰撞检测 隧穿是由于布料的速度过快导致的
                     if (DetectContactsBetweenParticleAndMesh(position, velocity, x1, x2, x3, u, v, w, n))
                     {
                         //cout << "这里碰撞了" << endl;
@@ -498,8 +500,7 @@ void StepPhysX()					//Stepping PhysX
                         PxReal particleMass = gFluid->getParticleMass();    //粒子质量 暂时没有用
                         //粒子的位置速度和作用力需要在update的时候每次用Buffer读取
                         //需要更新的信息主要是冲量
-                        //impulses[i] = gCloth->getStretchConfig(PxClothFabricPhaseType::eBENDING).stiffness*d*gTimeStep*(-1)*n;
-                        
+                        //impulses[i] = gCloth->getStretchConfig(PxClothFabricPhaseType::eBENDING).stiffness*d*gTimeStep*(-1)*n;                        
                         impulses[i] = 10*gFluid->getParticleMass() * (velocity.magnitude()) * (n);
                         //强制更新到前一刻的位置
                         //强制考虑布料厚度问题
